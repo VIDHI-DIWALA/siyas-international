@@ -51,14 +51,13 @@ def send_email(to_email, subject, body):
         resend.api_key = os.environ.get("RESEND_API_KEY")
         resend.Emails.send({
             "from": "Siya's International <onboarding@resend.dev>",
-            "to": ["to_email"],
+            "to": [to_email],
             "subject": subject,
             "text": body,
         })
         print(f"Email sent!")
     except Exception as e:
         print(f"Email failed: {e}")
-        
 
 
 # ===== WHATSAPP FUNCTION =====
@@ -132,11 +131,25 @@ def submit_booking():
         "is_deleted":  False
     }
     form1_collection.insert_one(data)
-    send_notification(data["contact"], data["email"],
-        f"Hi {data['fullname']}, your booking is received! We'll call you shortly. - Siya's International",
-        "Booking Confirmation")
-    send_email(OWNER_EMAIL, "New Booking Received!",
-        f"New Booking!\n\nName: {data['fullname']}\nContact: {data['contact']}\nBrand: {data['brand']}\nIssue: {data['issue']}\nDescription: {data['description']}")
+
+    # Message to customer
+    send_notification(
+        data["contact"], data["email"],
+        f"Dear {data['fullname']},\n\n"
+        f"Thank you for booking your repair with Siya's International. "
+        f"We have received your request and our team will contact you shortly.\n\n"
+        f"Brand: {data['brand']}\n"
+        f"Issue: {data['issue']}\n\n"
+        f"Regards,\nSiya's International",
+        "Booking Confirmation - Siya's International"
+    )
+
+    # Message to owner
+    send_email(
+        OWNER_EMAIL, "New Booking Received!",
+        f"New Booking!\n\nName: {data['fullname']}\nContact: {data['contact']}\nBrand: {data['brand']}\nIssue: {data['issue']}\nDescription: {data['description']}"
+    )
+
     flash("Booking submitted successfully!")
     return redirect(url_for("booking_page"))
 
@@ -182,11 +195,25 @@ def submit_chalan():
         "is_deleted":       False
     }
     form2_collection.insert_one(data)
-    send_notification(data["contact"], data["email"],
-        f"Hi {data['name']}, device received! Tracking No: {tracking_no} - Siya's International",
-        "Device Received")
-    send_email(OWNER_EMAIL, "New Device Received!",
-        f"Name: {data['name']}\nContact: {data['contact']}\nTracking: {tracking_no}\nBrand: {data['brand']}\nProblem: {data['problem']}")
+
+    # Message to customer
+    send_notification(
+        data["contact"], data["email"],
+        f"Dear {data['name']},\n\n"
+        f"Thank you for choosing Siya's International. Your device has been received for repair.\n\n"
+        f"Tracking Number: {tracking_no}\n\n"
+        f"You can track your repair status anytime using this tracking number or your "
+        f"registered phone number on our website.\n\n"
+        f"Regards,\nSiya's International",
+        "Device Received - Siya's International"
+    )
+
+    # Message to owner
+    send_email(
+        OWNER_EMAIL, "New Device Received!",
+        f"Name: {data['name']}\nContact: {data['contact']}\nTracking: {tracking_no}\nBrand: {data['brand']}\nProblem: {data['problem']}"
+    )
+
     flash(f"Device received! Tracking No: {tracking_no}")
     return redirect(url_for("tracking_page"))
 
@@ -284,9 +311,14 @@ def update_chalan_status():
         "admin_note": request.form.get("admin_note", "")
     }})
     if record:
-        send_notification(record.get("contact",""), record.get("email",""),
-            f"Hi {record['name']}, repair status updated: {new_status}. Tracking: {record['tracking_no']} - Siya's International",
-            "Repair Status Update")
+        send_notification(
+            record.get("contact",""), record.get("email",""),
+            f"Dear {record['name']},\n\n"
+            f"Your repair status has been updated to: {new_status}.\n"
+            f"Tracking Number: {record['tracking_no']}\n\n"
+            f"Regards,\nSiya's International",
+            "Repair Status Update - Siya's International"
+        )
     flash(f"Status updated to {new_status}")
     return redirect(url_for("admin_dashboard"))
 
@@ -344,9 +376,16 @@ def generate_bill(id):
     }})
     record = form2_collection.find_one({"_id": ObjectId(id)})
     if record:
-        send_notification(record.get("contact",""), record.get("email",""),
-            f"Hi {record['name']}, your bill is ready! Total: Rs.{total}. Tracking: {record['tracking_no']} - Siya's International",
-            "Bill Ready")
+        send_notification(
+            record.get("contact",""), record.get("email",""),
+            f"Dear {record['name']},\n\n"
+            f"Your repair bill has been generated.\n\n"
+            f"Tracking Number: {record['tracking_no']}\n"
+            f"Total Amount (incl. GST): Rs.{total}\n\n"
+            f"You can view and download your bill from our website using your tracking number.\n\n"
+            f"Regards,\nSiya's International",
+            "Your Bill is Ready - Siya's International"
+        )
     flash(f"Bill generated! Total: Rs.{total} (incl. GST)")
     return redirect(url_for("admin_dashboard"))
 
@@ -361,9 +400,14 @@ def engineer_update(id):
         "admin_note": request.form.get("work_note", "")
     }})
     if record:
-        send_notification(record.get("contact",""), record.get("email",""),
-            f"Hi {record['name']}, status updated: {new_status}. Tracking: {record['tracking_no']} - Siya's International",
-            "Status Update")
+        send_notification(
+            record.get("contact",""), record.get("email",""),
+            f"Dear {record['name']},\n\n"
+            f"Your repair status has been updated to: {new_status}.\n"
+            f"Tracking Number: {record['tracking_no']}\n\n"
+            f"Regards,\nSiya's International",
+            "Status Update - Siya's International"
+        )
     flash(f"Status updated to {new_status}")
     return redirect(url_for("engineer_dashboard"))
 
