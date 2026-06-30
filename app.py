@@ -46,16 +46,20 @@ ENGINEER_PASSWORD = "engineer123"
 # ===== EMAIL FUNCTION =====
 def send_email(to_email, subject, body):
     if not to_email:
+        print("send_email skipped: no to_email")
         return
     try:
         resend.api_key = os.environ.get("RESEND_API_KEY")
+        if not resend.api_key:
+            print("send_email failed: RESEND_API_KEY not set in environment")
+            return
         resend.Emails.send({
             "from": "Siya's International <onboarding@resend.dev>",
             "to": [to_email],
             "subject": subject,
             "text": body,
         })
-        print(f"Email sent!")
+        print(f"Email sent to {to_email}")
     except Exception as e:
         print(f"Email failed: {e}")
 
@@ -72,6 +76,7 @@ def send_notification(contact, email, message, subject="Notification"):
     try:
         result = send_whatsapp(contact, message)
         if "error" in result:
+            print(f"WhatsApp error: {result}")
             send_email(email, subject, message)
         else:
             print("WhatsApp sent")
@@ -115,7 +120,7 @@ def chalan_page():
     serial_no = str(count).zfill(3)
     return render_template("chalan.html", serial_no=serial_no)
 
-# ===== BOOKING SUBMIT =====
+# ===== BOOKING SUBMIT (1st form) =====
 @app.route("/submit-booking", methods=["POST"])
 def submit_booking():
     data = {
@@ -132,29 +137,23 @@ def submit_booking():
     }
     form1_collection.insert_one(data)
 
-    # Message to customer
-    send_notification(
-        data["contact"], data["email"],
-        f"Dear {data['fullname']},\n\n"
-        f"Thank you for booking your repair with Siya's International. "
-        f"We have received your request and our team will contact you shortly.\n\n"
-        f"Brand: {data['brand']}\n"
-        f"Issue: {data['issue']}\n\n"
-        f"Regards,\nSiya's International",
-        "Booking Confirmation - Siya's International"
-    )
-
-    # Message to owner (ONLY booking form sends to owner)
+    # ONLY owner gets this — with full form detail
     send_email(
         OWNER_EMAIL, "New Booking Received!",
-        f"New Booking!\n\nName: {data['fullname']}\nContact: {data['contact']}\nBrand: {data['brand']}\nIssue: {data['issue']}\nDescription: {data['description']}"
+        f"New Booking!\n\n"
+        f"Name: {data['fullname']}\n"
+        f"Contact: {data['contact']}\n"
+        f"Email: {data['email']}\n"
+        f"Brand: {data['brand']}\n"
+        f"Issue: {data['issue']}\n"
+        f"Description: {data['description']}"
     )
 
     flash("Booking submitted successfully!")
     return redirect(url_for("booking_page"))
 
 
-# ===== CHALAN SUBMIT =====
+# ===== CHALAN SUBMIT (2nd form) =====
 @app.route("/submit-chalan", methods=["POST"])
 def submit_chalan():
     tracking_no = "TRK" + str(random.randint(10000, 99999))
@@ -196,7 +195,7 @@ def submit_chalan():
     }
     form2_collection.insert_one(data)
 
-    # Message to customer ONLY (no owner email here)
+    # ONLY customer gets this — professional thank you + tracking detail
     send_notification(
         data["contact"], data["email"],
         f"Dear {data['name']},\n\n"
