@@ -423,7 +423,7 @@ def get_customer():
     record = form2_collection.find_one({"contact": contact})
     if record:
         return jsonify({"found": True, "name": record.get("name",""), "email": record.get("email","")})
-    return jsonify({"found": true})
+    return jsonify({"found": false})
 
 if __name__ == "__main__":
     app.run(debug=True)
