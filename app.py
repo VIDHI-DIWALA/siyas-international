@@ -10,7 +10,7 @@ import os
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
-app.secret_key = "siyas_secret_super_key"
+app.secret_key = os.environ.get("SECRET_KEY", "dev-only-fallback-key")
 
 # ===== UPLOAD =====
 UPLOAD_FOLDER = os.path.join('static', 'uploads')
@@ -23,8 +23,8 @@ def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 # ===== WHATSAPP =====
-ACCESS_TOKEN = "EAAPZCjepv8K0BR3LVZAJ1P9a71wmtvljDrc1RWsDrLfAteuTwzBMNOV5BIXV8RgCCm2lJTczaYlgmR4fw4vQYSAvZBZBLEx2BwOXuFGYO5TaBt4kvbvsddzm7sJmoFH616XATUn41f2ge0Mxn9PYWFZB1gHs5IUQJgIrutLXJbnAvOUutGhXyZB9ZBPyJiU0vXHe2P8n3i8YwREDDTZCfqKlqM4TQyjLtDNwDf79Nd5n"
-PHONE_NUMBER_ID = "1125409918808237"
+ACCESS_TOKEN = os.environ.get("WHATSAPP_ACCESS_TOKEN")
+PHONE_NUMBER_ID = os.environ.get("WHATSAPP_PHONE_ID")
 VERSION = "v20.0"
 WA_URL = f"https://graph.facebook.com/{VERSION}/{PHONE_NUMBER_ID}/messages"
 
@@ -36,15 +36,16 @@ OWNER_EMAIL = "siyas.care@gmail.com"
 REVIEW_LINK = "https://siyasinternational.com/"
 
 # ===== DATABASE =====
-client = pymongo.MongoClient("mongodb+srv://vidhi:Vidhi12@cluster0.lpjthfz.mongodb.net/?appName=Cluster0")
+MONGO_URI = os.environ.get("MONGO_URI")
+client = pymongo.MongoClient(MONGO_URI)
 db = client["siyas_database"]
 form1_collection = db["form1_records"]
 form2_collection = db["form2_records"]
 
 # ===== LOGIN =====
-ADMIN_USERNAME = "admin"
-ADMIN_PASSWORD = "password123"
-ENGINEER_PASSWORD = "engineer123"
+ADMIN_USERNAME = os.environ.get("ADMIN_USERNAME", "admin")
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "password123")
+ENGINEER_PASSWORD = os.environ.get("ENGINEER_PASSWORD", "engineer123")
 
 # ===== EMAIL FUNCTION =====
 def send_email(to_email, subject, body):
@@ -69,6 +70,8 @@ def send_email(to_email, subject, body):
 
 # ===== WHATSAPP FUNCTION =====
 def send_whatsapp(to_number, message_body):
+    if not ACCESS_TOKEN or not PHONE_NUMBER_ID:
+        return {"error": "WhatsApp credentials not configured"}
     headers = {"Authorization": f"Bearer {ACCESS_TOKEN}", "Content-Type": "application/json"}
     payload = {"messaging_product": "whatsapp", "to": to_number, "type": "text", "text": {"body": message_body}}
     response = requests.post(WA_URL, headers=headers, json=payload)
@@ -423,7 +426,7 @@ def get_customer():
     record = form2_collection.find_one({"contact": contact})
     if record:
         return jsonify({"found": True, "name": record.get("name",""), "email": record.get("email","")})
-    return jsonify({"found": false})
+    return jsonify({"found": False})
 
 if __name__ == "__main__":
     app.run(debug=True)
