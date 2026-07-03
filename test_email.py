@@ -5,8 +5,6 @@ from bson import ObjectId
 import pymongo
 import random
 import requests
-import smtplib
-from email.mime.text import MIMEText
 import os
 from werkzeug.utils import secure_filename
 
@@ -54,26 +52,34 @@ def send_email(to_email, subject, body):
         print("send_email skipped: no to_email")
         return
 
-    gmail_address = os.environ.get("GMAIL_ADDRESS")
-    gmail_app_password = os.environ.get("GMAIL_APP_PASSWORD")
+    brevo_api_key = os.environ.get("BREVO_API_KEY")
 
-    if not gmail_address or not gmail_app_password:
-        print("send_email failed: GMAIL_ADDRESS or GMAIL_APP_PASSWORD not set in environment")
+    if not brevo_api_key:
+        print("send_email failed: BREVO_API_KEY not set in environment")
         return
 
     try:
-        msg = MIMEText(body)
-        msg["Subject"] = subject
-        msg["From"] = f"Siya's International <{gmail_address}>"
-        msg["To"] = to_email
-
-        with smtplib.SMTP("smtp.gmail.com", 587, timeout=15) as server:
-              server.starttls()
-              server.login(gmail_address, gmail_app_password)
-              server.sendmail(gmail_address, [to_email], msg.as_string())
-
-
-        print(f"Email sent to {to_email}")
+        headers = {
+            "accept": "application/json",
+            "api-key": brevo_api_key,
+            "content-type": "application/json"
+        }
+        payload = {
+            "sender": {"name": "Siya's International", "email": "siyas.care@gmail.com"},
+            "to": [{"email": to_email}],
+            "subject": subject,
+            "textContent": body
+        }
+        response = requests.post(
+            "https://api.brevo.com/v3/smtp/email",
+            headers=headers,
+            json=payload,
+            timeout=15
+        )
+        if response.status_code in (200, 201):
+            print(f"Email sent to {to_email}")
+        else:
+            print(f"Email failed: {response.status_code} - {response.text}")
     except Exception as e:
         print(f"Email failed: {e}")
 
