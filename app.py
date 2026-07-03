@@ -5,14 +5,13 @@ from bson import ObjectId
 import pymongo
 import random
 import requests
-import smtplib
-from email.mime.text import MIMEText
 import os
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev-only-fallback-key")
 
+# ===== UPLOAD =====
 UPLOAD_FOLDER = os.path.join('static', 'uploads')
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
@@ -22,53 +21,71 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+# ===== WHATSAPP =====
 ACCESS_TOKEN = os.environ.get("WHATSAPP_ACCESS_TOKEN")
 PHONE_NUMBER_ID = os.environ.get("WHATSAPP_PHONE_ID")
 VERSION = "v20.0"
 WA_URL = f"https://graph.facebook.com/{VERSION}/{PHONE_NUMBER_ID}/messages"
 
+# ===== EMAIL =====
 EMAIL_SENDER = "siyas.care@gmail.com"
 OWNER_EMAIL = "siyas.care@gmail.com"
 
+# ===== REVIEW LINK =====
 REVIEW_LINK = "https://siyasinternational.com/"
 
+# ===== DATABASE =====
 MONGO_URI = os.environ.get("MONGO_URI")
 client = pymongo.MongoClient(MONGO_URI)
 db = client["siyas_database"]
 form1_collection = db["form1_records"]
 form2_collection = db["form2_records"]
 
+# ===== LOGIN =====
 ADMIN_USERNAME = os.environ.get("ADMIN_USERNAME", "admin")
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "password123")
 ENGINEER_PASSWORD = os.environ.get("ENGINEER_PASSWORD", "engineer123")
 
+# ===== EMAIL FUNCTION (Gmail SMTP) =====
 def send_email(to_email, subject, body):
     if not to_email:
         print("send_email skipped: no to_email")
         return
 
-    gmail_address = os.environ.get("GMAIL_ADDRESS")
-    gmail_app_password = os.environ.get("GMAIL_APP_PASSWORD")
+    brevo_api_key = os.environ.get("BREVO_API_KEY")
 
-    if not gmail_address or not gmail_app_password:
-        print("send_email failed: GMAIL_ADDRESS or GMAIL_APP_PASSWORD not set in environment")
+    if not brevo_api_key:
+        print("send_email failed: BREVO_API_KEY not set in environment")
         return
 
     try:
-        msg = MIMEText(body)
-        msg["Subject"] = subject
-        msg["From"] = f"Siya's International <{gmail_address}>"
-        msg["To"] = to_email
-
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-            server.login(gmail_address, gmail_app_password)
-            server.sendmail(gmail_address, [to_email], msg.as_string())
-
-        print(f"Email sent to {to_email}")
+        headers = {
+            "accept": "application/json",
+            "api-key": brevo_api_key,
+            "content-type": "application/json"
+        }
+        payload = {
+            "sender": {"name": "Siya's International", "email": "siyas.care@gmail.com"},
+            "to": [{"email": to_email}],
+            "subject": subject,
+            "textContent": body
+        }
+        response = requests.post(
+            "https://api.brevo.com/v3/smtp/email",
+            headers=headers,
+            json=payload,
+            timeout=15
+        )
+        if response.status_code in (200, 201):
+            print(f"Email sent to {to_email}")
+        else:
+            print(f"Email failed: {response.status_code} - {response.text}")
     except Exception as e:
         print(f"Email failed: {e}")
 
 
+
+# ===== WHATSAPP FUNCTION =====
 def send_whatsapp(to_number, message_body):
     if not ACCESS_TOKEN or not PHONE_NUMBER_ID:
         return {"error": "WhatsApp credentials not configured"}
@@ -77,6 +94,7 @@ def send_whatsapp(to_number, message_body):
     response = requests.post(WA_URL, headers=headers, json=payload)
     return response.json()
 
+# ===== NOTIFICATION (customer-facing only) =====
 def send_notification(contact, email, message, subject="Notification"):
     try:
         result = send_whatsapp(contact, message)
@@ -89,6 +107,7 @@ def send_notification(contact, email, message, subject="Notification"):
         print(f"WA error: {e}")
         send_email(email, subject, message)
 
+# ===== DECORATORS =====
 def admin_required(f):
     @wraps(f)
     def wrapper(*args, **kwargs):
@@ -105,6 +124,7 @@ def engineer_required(f):
         return f(*args, **kwargs)
     return wrapper
 
+# ===== ROUTES =====
 @app.route("/")
 def home():
     return redirect(url_for("booking_page"))
@@ -123,6 +143,7 @@ def chalan_page():
     serial_no = str(count).zfill(3)
     return render_template("chalan.html", serial_no=serial_no)
 
+# ===== BOOKING SUBMIT (1st form) — ONLY owner notified =====
 @app.route("/submit-booking", methods=["POST"])
 def submit_booking():
     data = {
@@ -154,6 +175,7 @@ def submit_booking():
     return redirect(url_for("booking_page"))
 
 
+# ===== CHALAN SUBMIT (2nd form) — ONLY customer notified =====
 @app.route("/submit-chalan", methods=["POST"])
 def submit_chalan():
     tracking_no = "TRK" + str(random.randint(10000, 99999))
@@ -209,6 +231,7 @@ def submit_chalan():
     flash(f"Device received! Tracking No: {tracking_no}")
     return redirect(url_for("tracking_page"))
 
+# ===== TRACKING =====
 @app.route("/tracking-result")
 def tracking_result_page():
     search = request.args.get("search_term", "").strip()
@@ -225,6 +248,7 @@ def tracking_result_page():
         record["_id"] = str(record["_id"])
     return render_template("tracking_result.html", found=found, record=record)
 
+# ===== BILL PAGE =====
 @app.route("/bill")
 def bill_page():
     search = request.args.get("search_term", "").strip()
@@ -238,6 +262,7 @@ def bill_page():
     record["_id"] = str(record["_id"])
     return render_template("bill.html", record=record)
 
+# ===== LOGIN =====
 @app.route("/admin-login", methods=["GET", "POST"])
 def staff_login_page():
     if request.method == "POST":
@@ -256,6 +281,7 @@ def engineer_login_page():
         flash("Wrong password")
     return render_template("staff_login.html")
 
+# ===== LOGOUT =====
 @app.route("/admin-logout")
 def admin_logout():
     session.pop("admin_logged_in", None)
@@ -266,6 +292,7 @@ def engineer_logout():
     session.pop("engineer_logged_in", None)
     return redirect(url_for("engineer_login_page"))
 
+# ===== DASHBOARDS =====
 @app.route("/admin-dashboard")
 @admin_required
 def admin_dashboard():
@@ -279,6 +306,7 @@ def engineer_dashboard():
     chalans = list(form2_collection.find({"is_deleted": False}))
     return render_template("engineer_dashboard.html", chalans=chalans)
 
+# ===== ADMIN ACTIONS =====
 @app.route("/update-booking-status", methods=["POST"])
 @admin_required
 def update_booking_status():
@@ -340,6 +368,7 @@ def clear_chalans():
     flash("All records cleared")
     return redirect(url_for("admin_dashboard"))
 
+# ===== GENERATE BILL — ONLY customer notified, with thank you + review link =====
 @app.route("/generate-bill/<id>", methods=["POST"])
 @admin_required
 def generate_bill(id):
@@ -380,6 +409,7 @@ def generate_bill(id):
     flash(f"Bill generated! Total: Rs.{total} (incl. GST)")
     return redirect(url_for("admin_dashboard"))
 
+# ===== ENGINEER UPDATE — ONLY customer notified =====
 @app.route("/engineer-update/<id>", methods=["POST"])
 @engineer_required
 def engineer_update(id):
@@ -401,6 +431,7 @@ def engineer_update(id):
     flash(f"Status updated to {new_status}")
     return redirect(url_for("engineer_dashboard"))
 
+# ===== GET CUSTOMER =====
 @app.route("/get-customer")
 def get_customer():
     contact = request.args.get("contact", "").strip()
