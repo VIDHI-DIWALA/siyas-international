@@ -67,13 +67,16 @@ def send_email(to_email, subject, body):
         msg["From"] = f"Siya's International <{gmail_address}>"
         msg["To"] = to_email
 
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-            server.login(gmail_address, gmail_app_password)
-            server.sendmail(gmail_address, [to_email], msg.as_string())
+        with smtplib.SMTP("smtp.gmail.com", 587, timeout=15) as server:
+              server.starttls()
+              server.login(gmail_address, gmail_app_password)
+              server.sendmail(gmail_address, [to_email], msg.as_string())
+
 
         print(f"Email sent to {to_email}")
     except Exception as e:
         print(f"Email failed: {e}")
+
 
 
 # ===== WHATSAPP FUNCTION =====
